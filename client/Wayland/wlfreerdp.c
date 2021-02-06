@@ -270,7 +270,8 @@ static BOOL wl_post_connect(freerdp* instance)
 	instance->update->BeginPaint = wl_begin_paint;
 	instance->update->EndPaint = wl_end_paint;
 	instance->update->DesktopResize = wl_resize_display;
-	freerdp_keyboard_init(instance->context->settings->KeyboardLayout);
+	freerdp_keyboard_init_ex(instance->context->settings->KeyboardLayout,
+	                         instance->context->settings->KeyboardRemappingList);
 
 	if (!(context->disp = wlf_disp_new(context)))
 		return FALSE;
@@ -356,6 +357,9 @@ static BOOL handle_uwac_events(freerdp* instance, UwacDisplay* display)
 				break;
 
 			case UWAC_EVENT_POINTER_AXIS:
+				break;
+
+			case UWAC_EVENT_POINTER_AXIS_DISCRETE:
 				if (!wlf_handle_pointer_axis(instance, &event.mouse_axis))
 					return FALSE;
 
@@ -394,6 +398,12 @@ static BOOL handle_uwac_events(freerdp* instance, UwacDisplay* display)
 
 				break;
 
+			case UWAC_EVENT_KEYBOARD_MODIFIERS:
+				if (!wlf_keyboard_modifiers(instance, &event.keyboard_modifiers))
+					return FALSE;
+
+				break;
+
 			case UWAC_EVENT_CONFIGURE:
 				if (!wlf_disp_handle_configure(context->disp, event.configure.width,
 				                               event.configure.height))
@@ -409,6 +419,11 @@ static BOOL handle_uwac_events(freerdp* instance, UwacDisplay* display)
 			case UWAC_EVENT_CLIPBOARD_SELECT:
 				if (!wlf_cliprdr_handle_event(context->clipboard, &event.clipboard))
 					return FALSE;
+
+				break;
+
+			case UWAC_EVENT_CLOSE:
+				context->closed = TRUE;
 
 				break;
 
@@ -479,6 +494,12 @@ static int wlfreerdp_run(freerdp* instance)
 		if (!handle_uwac_events(instance, context->display))
 		{
 			WLog_Print(context->log, WLOG_ERROR, "error handling UWAC events");
+			break;
+		}
+
+		if (context->closed)
+		{
+			WLog_Print(context->log, WLOG_INFO, "Closed from Wayland");
 			break;
 		}
 
